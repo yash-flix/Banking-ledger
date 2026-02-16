@@ -1,6 +1,7 @@
 const userModel = require("../models/user.model.js")
 const jwt = require("jsonwebtoken");
 require("dotenv").config();
+const emailService = require("../services/email.service.js")
 
 
 /** 
@@ -36,6 +37,7 @@ res.status(201).json({
        } ,
        token
 })
+await emailService.sendRegistrationEmail(user.email , user.name);
 
 }
 
