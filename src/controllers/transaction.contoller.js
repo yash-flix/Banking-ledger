@@ -39,36 +39,53 @@ async function createTransaction(req,res)
         })
     }
 
-        /**
+    /**
      *  Validate idempotencyKey
      */
 const isTransactionAlreadyExists = await transactionModel.findOne({idempotencyKey});
 
-if(isTransactionAlreadyExists.status == "COMPLETED")
+if(isTransactionAlreadyExists)
 {
-    res.status(200).json({
-        message:"Transaction is successfull",
-        transaction : idempotencyKey
-    })
+    if(isTransactionAlreadyExists.status == "COMPLETED")
+    {
+       return res.status(200).json({
+            message:"Transaction is successfull",
+            transaction : idempotencyKey
+        })
+    }
+    if(isTransactionAlreadyExists.status == "PENDING")
+    {
+       return res.status(200).json({
+            message:"Transaction is still processing"
+        })
+    }
+    if(isTransactionAlreadyExists.status == "FAILED")
+    {
+       return res.status(500).json({
+            message:"Transaction processing failed , please retry"
+        })
+    }
+    if(isTransactionAlreadyExists.status == "REVERSED")
+    {
+       return res.status(500).json({
+            message:"Transaction is reversed , please retry"
+        })
+    }
 }
-if(isTransactionAlreadyExists.status == "PENDING")
-{
-    res.status(200).json({
-        message:"Transaction is still processing"
-    })
-}
-if(isTransactionAlreadyExists.status == "FAILED")
-{
-    res.status(500).json({
-        message:"Transaction processing failed , please retry"
-    })
-}
-if(isTransactionAlreadyExists.status == "REVERSED")
-{
-    res.status(500).json({
-        message:"Transaction is reversed , please retry"
-    })
-}
+    /**
+     *  check Account status
+     */
+    if(fromUserAccount.status!= "ACTIVE" || toUserAccount.status != "ACTIVE")
+    {
+        return res.status(400).json({
+            message:"Either fromAccount or toAccount is not active"
+        })
+    }
+    /**
+     *  Derive sender balance
+     */
+    const getfromUserAccountBalance =  await fromUserAccount.getBalance()
+
 }
  
 module.exports = 
