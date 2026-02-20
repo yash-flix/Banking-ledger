@@ -2,6 +2,7 @@ const transactionModel = require("../models/transaction.model.js");
 const ledgerModel = require("../models/ledger.model.js");
 const accountModel = require("../models/account.model.js");
 const emailService = require("../services/email.service.js");
+const mongoose = require("mongoose");
 
 /** -Create a new transaction
  * THE 10-STEP TRANSFER FLOW:
@@ -9,11 +10,12 @@ const emailService = require("../services/email.service.js");
 2. Validate idempotency key
 3. Check account status from ledger
 4. Derive sender balance (PENDING)
-5. Create DEBIT ledger entry
-6. Create CREDIT ledger entry
-7. Mark transaction COMPLETED
-8. Commit MongoDB session
-9. Send email notification
+5. create transaction (PENDING) using sessions
+6. Create DEBIT ledger entry
+7. Create CREDIT ledger entry
+8. Mark transaction COMPLETED
+9. Commit MongoDB session
+10. Send email notification
 * Mark transfer COMPLETED 
  */
 
@@ -84,7 +86,57 @@ if(isTransactionAlreadyExists)
     /**
      *  Derive sender balance
      */
-    const getfromUserAccountBalance =  await fromUserAccount.getBalance()
+    const balance =  await fromUserAccount.getBalance()
+    if(balance < amount)
+    {
+        return res.status(400).json({
+            message : `Insufficient balance. Current balance is ${balance}.
+            Requested amount is ${amount}`
+        })
+    }
+     /**
+     *  create a transaction (PENDING)
+     */
+    const session = await mongoose.startSession()
+    session.startTransaction()
+    
+    const transaction = await transactionModel.create({
+        fromAccount ,
+        toAccount , 
+        amount,
+        idempotencyKey,
+        status : "PENDING"
+    } , {session})
+
+    const creditLegerEntry = await ledgerModel.create(
+        {
+            account : fromAccount ,
+            amount : amount ,
+            transaction : transaction._id , 
+            type : "CREDIT"
+        } ,
+        {session}
+    )
+    const debitLegerEntry = await ledgerModel.create(
+        {
+            account : toAccount ,
+            amount : amount ,
+            transaction : transaction._id , 
+            type : "DEBIT"
+        } ,
+        {session}
+    )
+    transaction.status = "COMPLETED";
+    await transaction.save({session})
+
+    await session.commitTransaction();
+    session.endSession();
+
+     /**
+     *  send email notification
+     */
+    await emailService.sendTransactionEmail(req.user.email , req.user.name, amount , toAccount);
+    return res.status(201).json({message: "Transacion completed successfully" , transaction : transaction})
 
 }
  
