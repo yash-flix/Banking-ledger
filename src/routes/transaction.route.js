@@ -9,4 +9,10 @@ const transactionController = require("../controllers/transaction.contoller.js")
 
 transactionRoutes.post("/" ,authMiddleware.authMiddleware ,transactionController.createTransaction )
 
+/**
+ * -POST /api/transactions/system/initial-funds
+ * -Create inital funds transaction from system account to a user account
+ */
+transactionRoutes.post("/system/initial-fund" , authMiddleware.authSystemUserMiddleware , transactionController.createInitialFundTransaction)
+
 module.exports = transactionRoutes;
